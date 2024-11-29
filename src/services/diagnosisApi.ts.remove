@@ -1,0 +1,66 @@
+import axios from 'axios';
+
+const API_URL = 'https://strapi-186773-0.cloudclusters.net/api';
+
+export interface DiagnosisType {
+  id: number;
+  attributes: {
+    name: string;
+    createdAt: string | null;
+    updatedAt: string | null;
+  };
+}
+
+export interface Diagnosis {
+  id: number;
+  attributes: {
+    dia: string;
+    createdAt: string | null;
+    updatedAt: string | null;
+    dia_type: {
+      data: DiagnosisType | null;
+    };
+  };
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    pagination: {
+      page: number;
+      pageSize: number;
+      pageCount: number;
+      total: number;
+    };
+  };
+}
+
+export const diagnosisApi = {
+  search: async (searchTerm: string, page: number = 1, pageSize: number = 25): Promise<PaginatedResponse<Diagnosis>> => {
+    try {
+      const response = await axios.get(`${API_URL}/dias`, {
+        params: {
+          populate: '*',
+          'filters[dia][$containsi]': searchTerm,
+          'pagination[page]': page,
+          'pagination[pageSize]': pageSize,
+          sort: 'dia:asc',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error searching diagnoses:', error);
+      return { data: [], meta: { pagination: { page: 1, pageSize, pageCount: 0, total: 0 } } };
+    }
+  },
+
+  getAll: async (): Promise<Diagnosis[]> => {
+    try {
+      const response = await axios.get(`${API_URL}/dias?populate=*`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching diagnoses:', error);
+      return [];
+    }
+  },
+};

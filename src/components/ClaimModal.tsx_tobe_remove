@@ -1,0 +1,137 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Trash, Save, Printer } from 'lucide-react';
+import { useQuery } from 'react-query';
+import { fetchPatients, fetchDrugsAndServices, fetchUsers, fetchInvoices } from '../services/api';
+import { fetchInsurers } from '../services/api';
+import PrintableInvoice from './PrintableInvoice';
+
+interface ClaimModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (claimData: any) => void;
+  invoices: any[];
+}
+
+const ClaimModal: React.FC<ClaimModalProps> = ({ isOpen, onClose, onSubmit, invoices }) => {
+  const [formData, setFormData] = useState({
+    patientId: '',
+    insurerId: '',
+    selectedInvoices: [],
+    totalAmount: 0,
+  });
+
+  const { data: patients } = useQuery('patients', fetchPatients);
+  const { data: insurers } = useQuery('insurers', fetchInsurers);
+  const { data: drugsAndServices } = useQuery('drugsAndServices', fetchDrugsAndServices);
+  const { data: users } = useQuery('users', fetchUsers);
+
+  useEffect(() => {
+    const total = formData.selectedInvoices.reduce((sum, invoiceId) => {
+      const invoice = invoices.find((inv: any) => inv.id === invoiceId);
+      return sum + (invoice ? invoice.amount : 0);
+    }, 0);
+    setFormData(prev => ({ ...prev, totalAmount: total }));
+  }, [formData.selectedInvoices, invoices]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleInvoiceSelection = (invoiceId: string) => {
+    setFormData(prev => {
+      const isSelected = prev.selectedInvoices.includes(invoiceId);
+      const updatedInvoices = isSelected
+        ? prev.selectedInvoices.filter(id => id !== invoiceId)
+        : [...prev.selectedInvoices, invoiceId];
+      return { ...prev, selectedInvoices: updatedInvoices };
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center overflow-y-auto">
+      <div className="bg-white rounded-lg p-8 w-full max-w-2xl my-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Submit New Claim</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={24} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="patientId" className="block text-sm font-medium text-gray-700">Patient</label>
+            <select
+              id="patientId"
+              name="patientId"
+              value={formData.patientId}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+              required
+            >
+              <option value="">Select Patient</option>
+              {patients?.map((patient: any) => (
+                <option key={patient.id} value={patient.id}>{patient.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mb-4">
+            <label htmlFor="insurerId" className="block text-sm font-medium text-gray-700">Insurer</label>
+            <select
+              id="insurerId"
+              name="insurerId"
+              value={formData.insurerId}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+              required
+            >
+              <option value="">Select Insurer</option>
+              {insurers?.map((insurer: any) => (
+                <option key={insurer.id} value={insurer.id}>{insurer.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Invoices</label>
+            <div className="max-h-48 overflow-y-auto border rounded-md p-2">
+              {invoices
+                .filter((invoice: any) => invoice.insurerId === formData.insurerId)
+                .map((invoice: any) => (
+                  <div key={invoice.id} className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.selectedInvoices.includes(invoice.id)}
+                      onChange={() => handleInvoiceSelection(invoice.id)}
+                      className="mr-2"
+                    />
+                    <label className="text-sm">
+                      Invoice #{invoice.invoiceNumber} - ${invoice.amount.toFixed(2)}
+                    </label>
+                  </div>
+                ))}
+            </div>
+          </div>
+          <div className="mb-4">
+            <p className="text-lg font-semibold">Total Amount: ${formData.totalAmount.toFixed(2)}</p>
+          </div>
+          <div className="mt-6">
+            <button
+              type="submit"
+              className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            >
+              Submit Claim
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ClaimModal;
